@@ -22,12 +22,8 @@
 
 // FDD2 = PORTTA
 #define FDD2 ((vuint8*) (0x4010000E))
-#define FDD2_DIRECTION (0x1)
-#define FDD2_STEP (0x2)
-
-//#define FDD2 ((vuint8*) (0x40100011))
-//#define FDD2_DIRECTION 0x2
-//#define FDD2_STEP 0x4
+#define FDD2_DIRECTION (0x4)
+#define FDD2_STEP (0x8)
 
 __declspec(interrupt:0) void timerHandler(void);
 void initializeFloppies();

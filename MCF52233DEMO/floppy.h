@@ -25,6 +25,7 @@
 #define FDD2_DIRECTION (0x4)
 #define FDD2_STEP (0x8)
 
+void midiLoop();
 __declspec(interrupt:0) void timerHandler(void);
 void initializeFloppies();
 void initializeGPIO();

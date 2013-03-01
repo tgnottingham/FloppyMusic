@@ -174,27 +174,79 @@ uint16 count_until_reversal[NUM_FLOPPIES];
 int main(void)
 {
 	int counter = 0;
-	int adc_counts = 0;
-	int adc_counts1 = 0;
 	
 	initializeFloppies();
 	initializeGPIO();
 	initializeInterrupts();
 	initializePIT();
-
-	//initializeADC();
-	
-	MCF_GPIO_PANPAR = MCF_GPIO_PANPAR_PANPAR1;
-	MCF_ADC_POWER  = MCF_ADC_POWER_PUDELAY(13);
-	
+	initializeADC();
 	//uart_init(0, SYSTEM_CLOCK_KHZ, kBaud19200);
-
+	
 	resetFloppies();
 	
 	// Enable PIT0 timer
 	MCF_PIT0_PCSR |= MCF_PIT_PCSR_EN;
+	
+	//midiLoop();
 
-/*
+    // start initial ADC conversion
+    MCF_ADC_CTRL2 = MCF_ADC_CTRL2_START1;
+
+	for (;;)
+	{
+        if ((counter++ & 0x01fffff) == 0)
+        {
+        	int adcValue;
+        	int minNoteIndex = 44;
+			int minDistance = 10;
+			int maxDistance = 60;
+			int cmPerNote = 10;
+        	int cm;
+        	
+        	// DS0 -> Pin 18 -> AN4 -> ADRSLT0
+            adcValue = MCF_ADC_ADRSLT7 >> 3;
+			cm = 1.0 / ((adcValue - 2900) / 30000.0 + .1);
+			//printf("ds0: %i\n", adcValue);
+			
+			if (cm >= minDistance && cm < maxDistance) 
+			{
+				int index = minNoteIndex +
+					(cm - minDistance) / cmPerNote;
+				//printf("note: %i\n", index);
+				setFloppyFrequency(0, NOTE_FREQUENCY[index]);
+				//setFloppyFrequency(1, NOTE_FREQUENCY[index]);
+			}
+			else 
+        	{
+        		setFloppyPeriod(0, 0);
+        		//setFloppyPeriod(1, 0);
+        	}
+        	
+        	// DS1 -> Pin 16 -> AN3 -> ADRSLT1
+            adcValue = MCF_ADC_ADRSLT5 >> 3;
+			cm = 1.0 / ((adcValue - 2900) / 30000.0 + .1);
+        	//printf("ds1: %i\n", adcValue);
+        	
+			if (cm >= minDistance && cm < maxDistance) 
+			{
+				int index = minNoteIndex +
+					(cm - minDistance) / cmPerNote;
+					
+				setFloppyFrequency(1, NOTE_FREQUENCY[index]);
+			}
+			else 
+        	{
+        		setFloppyPeriod(1, 0);
+        	}
+        	
+            // start next ADC conversion
+            MCF_ADC_CTRL2 = MCF_ADC_CTRL2_START1;
+        }
+	}
+}
+
+void midiLoop() 
+{
 	for (;;) 
 	{
 		unsigned char channel;
@@ -216,67 +268,6 @@ int main(void)
 
 			setFloppyPeriod(channel, period);
 		}
-	}
-*/
-	MCF_ADC_CTRL1 = 0;
-	MCF_ADC_ADSDIS = 0;
-	MCF_ADC_ADLST1 = 0;
-	MCF_ADC_ADLST2 = 0;
-	MCF_ADC_CTRL1 |= MCF_ADC_CTRL1_START0;
-	
-	for (;;)
-	{
-        if ((counter++ & 0x0fffff) == 0)
-        {
-        	int cm;
-			int minDistance = 10;
-			int maxDistance = 50;
-			int cmPerNote = 4;
-			int minNoteIndex = 37;
-        	
-        	// Pin 12
-            adc_counts = MCF_ADC_ADRSLT0 >> 3;
-
-			cm = 1.0 / ((adc_counts - 2900) / 30000.0 + .1);
-			printf("adc %i\n", adc_counts);
-			printf("cm %i\n", cm);
-
-/*
-			// Continuous
-			if (cm >= minDistance && cm < maxDistance) 
-			{
-				int noteNumber = minNoteIndex - 1+
-					(cm - minDistance) / (float) cmPerNote;
-				
-				float frequency = 440.0 *
-				    pow(2, (noteNumber - 69) / 12.0);
-				
-				setFloppyFrequency(0, frequency);
-			}
-			else 
-        	{
-        		setFloppyPeriod(0, 0);
-        	}
-*/
-			// Discrete
-			
-			if (cm >= minDistance && cm < maxDistance) 
-			{
-				int index = minNoteIndex +
-					(cm - minDistance) / cmPerNote;
-					
-				setFloppyFrequency(0, NOTE_FREQUENCY[index]);
-				setFloppyFrequency(1, NOTE_FREQUENCY[index + 7]);
-			}
-			else 
-        	{
-        		setFloppyPeriod(0, 0);
-        		setFloppyPeriod(1, 0);
-        	}
-        	
-            // start next ADC conversion
-            MCF_ADC_CTRL1 = MCF_ADC_CTRL1_START0;
-        }
 	}
 }
 
@@ -428,9 +419,9 @@ inline void initializeGPIO()
 	
 	
 	// Enable ADC on port AN for DS0 and DS1
-	MCF_GPIO_PANPAR = 0xFF; //0
-	//	| MCF_GPIO_PANPAR_AN3_AN3		// DS1 input pin
-	//	| MCF_GPIO_PANPAR_AN4_AN4;		// DS0 input pin
+	MCF_GPIO_PANPAR = 0
+		| MCF_GPIO_PANPAR_AN5_AN5		// DS1 input pin
+		| MCF_GPIO_PANPAR_AN7_AN7;		// DS0 input pin
 
 
 	// Set FDDn output pins to low.
@@ -484,18 +475,22 @@ inline void initializeADC()
 	// Scanning two samples in this mode takes
 	// 1.7 + 1.2 = 3.9 microseconds.
 	// (1st sample + 2nd sample)
-	MCF_ADC_CTRL1 = 0;
+	MCF_ADC_CTRL1 = 1;
+	MCF_ADC_CTRL2 = 0x0002;
 	
 	// Enable scanning of distance sensor 0 (DS0) on
 	// pin AN4 and distance sensor 1 (DS1) on pin AN3
 	// RSLT0 will be scan result for DS0
 	// RSLT1 will be scan result for DS1
-	MCF_ADC_ADLST1 = (0
-		| MCF_ADC_ADLST1_SAMPLE0(4)
-		| MCF_ADC_ADLST1_SAMPLE1(3));
+	//MCF_ADC_ADLST1 = 0
+	//	| MCF_ADC_ADLST1_SAMPLE0(0);
+		
+	MCF_ADC_ADLST2 = 0
+		| MCF_ADC_ADLST2_SAMPLE5(5)
+		| MCF_ADC_ADLST2_SAMPLE7(7);
 	
 	// Disable scanning for all other samples
-	MCF_ADC_ADSDIS = MCF_ADC_ADSDIS_DS2;
+	//MCF_ADC_ADSDIS = MCF_ADC_ADSDIS_DS2;
 	
 	// Power up ADCs with a 0x0d ADC clock cycle delay.
 	// Disable auto standby and auto power-down modes.
@@ -529,19 +524,19 @@ inline void setFloppyFrequency(uint16 floppy, float frequency)
 		{
 			// Disable PIT0 interrupts, update step_period, and
 			// restore interrupt mask register to previous state
-			//const uint32 mask = MCF_INTC0_IMRH;
-			//MCF_INTC0_IMRH |= MCF_INTC_IMRH_INT_MASK55;
+			const uint32 mask = MCF_INTC0_IMRH;
+			MCF_INTC0_IMRH |= MCF_INTC_IMRH_INT_MASK55;
 			step_period[floppy] = (uint16) (INTERRUPT_FREQUENCY / frequency + .5);
-			//count_until_step[floppy] = step_period[floppy];
-			//MCF_INTC0_IMRH = mask;
+			count_until_step[floppy] = step_period[floppy];
+			MCF_INTC0_IMRH = mask;
 		}
 		else 
 		{
-			//const uint32 mask = MCF_INTC0_IMRH;
-			//MCF_INTC0_IMRH |= MCF_INTC_IMRH_INT_MASK55;
+			const uint32 mask = MCF_INTC0_IMRH;
+			MCF_INTC0_IMRH |= MCF_INTC_IMRH_INT_MASK55;
 			step_period[floppy] = 0;
-			//count_until_step[floppy] = 0;
-			//MCF_INTC0_IMRH = mask;
+			count_until_step[floppy] = 0;
+			MCF_INTC0_IMRH = mask;
 		}
 	}
 }

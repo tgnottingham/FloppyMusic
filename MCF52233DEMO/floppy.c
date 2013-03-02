@@ -29,6 +29,10 @@ const uint16 NOTE_PERIOD[] =
     0, 0, 0, 0, 0, 0, 0, 0,
 };
 
+// Hand initialize these given NOTE_PERIOD data.
+// Used in getNearestNoteIndex() and setFloppyPeriod().
+const uint16 MIN_NOTE_INDEX = 1;
+const uint16 MAX_NOTE_INDEX = 70;
 const uint16 MIN_NOTE_PERIOD = 114;
 
 const int CHROMATIC[] = 
@@ -182,11 +186,27 @@ const uint8 SSEG_F = 0b01000111;
 const uint8 SSEG_G = 0b01111011;
 const uint8 SSEG_FLAT = 0b00011111;
 
+const uint8 SSEG_DIGIT0_SYMBOLS[] =
+{
+	SSEG_C, SSEG_D, SSEG_D,
+	SSEG_E, SSEG_E, SSEG_F,
+	SSEG_G, SSEG_G, SSEG_A,
+	SSEG_A, SSEG_B, SSEG_B
+};
+
+const uint8 SSEG_DIGIT1_SYMBOLS[] =
+{
+	SSEG_BLANK, SSEG_FLAT, SSEG_BLANK,
+	SSEG_FLAT, SSEG_BLANK, SSEG_BLANK,
+	SSEG_FLAT, SSEG_BLANK, SSEG_FLAT,
+	SSEG_BLANK, SSEG_FLAT, SSEG_BLANK
+};
+
 uint8 sseg0digit0 = 0;
 uint8 sseg0digit1 = 0;
-uint8 sseg1digit0 = SSEG_A;
-uint8 sseg1digit1 = SSEG_FLAT;
-uint8 currentSsegDigit = 1;
+uint8 sseg1digit0 = 0;
+uint8 sseg1digit1 = 0;
+uint8 currentSsegDigit = 0;
 
 //////////
 // CODE //
@@ -194,6 +214,9 @@ uint8 currentSsegDigit = 1;
 
 int main(void)
 {
+	int counter = 0;
+	int index;
+	
 	initializeFloppies();
 	initializeGPIO();
 	initializeInterrupts();
@@ -206,19 +229,21 @@ int main(void)
 	// Enable PIT0 timer
 	MCF_PIT0_PCSR |= MCF_PIT_PCSR_EN;
 	
-	setSSEG(1, SSEG_BLANK);
-	SSEGOn(1, 0);
-	SSEGOn(1, 1);
-	
 	midiModeLoop();
 	//instrumentModeLoop();
 }
 
 void midiModeLoop() 
 {
+	unsigned char channel;
+	uint8 periodHighByte;
+	uint8 periodLowByte;
+	uint16 period;
+	uint8 nearestNoteIndex;
+	uint8 nearestNoteNumberMod12;
+	
 	for (;;) 
 	{
-		unsigned char channel;
 		channel = uart_getchar(0);
 		
 		if (channel == RESET_FLOPPIES_MESSAGE) 
@@ -227,15 +252,47 @@ void midiModeLoop()
 		}
 		else 
 		{
-			uint8 periodHighByte;
-			uint8 periodLowByte;
-			uint16 period;
-			
 			periodHighByte = uart_getchar(0);
 			periodLowByte = uart_getchar(0);
 			period = (uint16) (((periodHighByte & 0xFF) << 8) | (periodLowByte & 0xFF));
 
-			setFloppyPeriod(channel, period);
+			// Need to change this if floppy channel
+			// ever becomes configurable.
+			// Probably should clean up logic anyway...
+			if (channel < NUM_FLOPPIES) 
+			{
+				setFloppyPeriod(channel, period);
+				
+				nearestNoteIndex = getNearestNoteIndex(period);
+				if (nearestNoteIndex == 0) 
+				{
+					if (channel == 2) 
+					{
+						sseg0digit0 = SSEG_BLANK;
+						sseg0digit1 = SSEG_BLANK;
+					}
+					else if (channel == 0) 
+					{
+						sseg1digit0 = SSEG_BLANK;
+						sseg1digit1 = SSEG_BLANK;
+					}
+				}
+				else
+				{
+					nearestNoteNumberMod12 = (uint8) ((nearestNoteIndex - 1) % 12);
+					
+					if (channel == 2) 
+					{
+						sseg0digit0 = SSEG_DIGIT0_SYMBOLS[nearestNoteNumberMod12];
+						sseg0digit1 = SSEG_DIGIT1_SYMBOLS[nearestNoteNumberMod12];;
+					}
+					else if (channel == 0) 
+					{
+						sseg1digit0 = SSEG_DIGIT0_SYMBOLS[nearestNoteNumberMod12];;
+						sseg1digit1 = SSEG_DIGIT1_SYMBOLS[nearestNoteNumberMod12];;
+					}
+				}
+			}
 		}
 	}
 }
@@ -525,8 +582,7 @@ inline void initializeGPIO()
 		| MCF_GPIO_PORTTA_PORTTA2	// SSEG1 only on these
 		| MCF_GPIO_PORTTA_PORTTA3);	// two pins of TA
 	MCF_GPIO_PORTQS = 0
-		| MCF_GPIO_PORTQS_PORTQS1	// Set SSEG1 pins 1 and 2
-		| MCF_GPIO_PORTQS_PORTQS2;	// high to turn off
+		| MCF_GPIO_PORTQS_PORTQS1;	// Set SSEG1 digit 1 off
 }
 
 inline void initializeInterrupts() 
@@ -710,5 +766,75 @@ inline void SSEGOff(uint8 sseg, uint8 digit)
 		}
 		
 		break;
+	}
+}
+
+// Returns MIN_NOTE_INDEX for pitches lower than
+// NOTE_PERIOD[MIN_NOTE_INDEX] and MAX_NOTE_INDEX
+// for pitches higher than NOTE_PERIOD[MAX_NOTE_INDEX].
+uint8 getNearestNoteIndex(uint16 period) 
+{
+	uint8 low = MIN_NOTE_INDEX;
+	uint8 high = MAX_NOTE_INDEX;
+	uint8 middle;
+	
+	if (period == 0) 
+	{
+		return 0;
+	}
+	
+	while (low < high) 
+	{
+		middle = (uint8) ((low + high) / 2);
+		
+		if (period < NOTE_PERIOD[middle]) 
+		{
+			low = (uint8) (middle + 1);
+		}
+		else if (period > NOTE_PERIOD[middle]) 
+		{
+			high = (uint8) (middle - 1);
+		}
+		else if (period == NOTE_PERIOD[middle]) 
+		{
+			return middle;
+		}
+	}
+	
+	// Find out which note is closest, roughly,
+	// since note frequency doesn't increase
+	// linearly with perceived pitch.
+	
+	if (period < NOTE_PERIOD[low]) 
+	{
+		if (low == MAX_NOTE_INDEX) 
+		{
+			return MAX_NOTE_INDEX;
+		}
+		
+		if (NOTE_PERIOD[low] - period < period - NOTE_PERIOD[low + 1]) 
+		{
+			return low;
+		}
+		else 
+		{
+			return (uint8) (low + 1);
+		}
+	}
+	else
+	{
+		if (low == MIN_NOTE_INDEX) 
+		{
+			return MIN_NOTE_INDEX;
+		}
+		
+		if (period - NOTE_PERIOD[low] < NOTE_PERIOD[low - 1] - period) 
+		{
+			return low;
+		}
+		else 
+		{
+			return (uint8) (low - 1);
+		}
 	}
 }

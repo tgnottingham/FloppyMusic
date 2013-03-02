@@ -39,5 +39,6 @@ void setFloppyPeriod(uint16 floppy, uint16 period);
 void setSSEG(uint8 sseg, uint8 state);
 void SSEGOn(uint8 sseg, uint8 digit);
 void SSEGOff(uint8 sseg, uint8 digit);
+uint8 getNearestNoteIndex(uint16 period);
 
 #endif

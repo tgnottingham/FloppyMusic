@@ -25,16 +25,17 @@
 #define FDD2_DIRECTION (0x4)
 #define FDD2_STEP (0x8)
 
-void midiLoop();
+void midiModeLoop();
+void instrumentModeLoop();
 __declspec(interrupt:0) void timerHandler(void);
+void resetFloppies();
 void initializeFloppies();
 void initializeGPIO();
 void initializeInterrupts();
 void initializePIT();
 void initializeADC();
 uint16 getModulus(uint16 prescaler, uint32 frequency);
-void setFloppyFrequency(uint16 floppy, float frequency);
 void setFloppyPeriod(uint16 floppy, uint16 period);
-void resetFloppies();
+void setSSEG(uint8 state);
 
 #endif

@@ -13,21 +13,23 @@
 // NOTE HANDLING //
 ///////////////////
 
-const float NOTE_FREQUENCY[] =
+const uint16 NOTE_PERIOD[] =
 {
 	0,
-	8.1758, 8.66196, 9.17702, 9.72272, 10.3009, 10.9134, 11.5623, 12.2499, 12.9783, 13.75, 14.5676, 15.4339,
-	16.3516, 17.3239, 18.354, 19.4454, 20.6017, 21.8268, 23.1247, 24.4997, 25.9565, 27.5, 29.1352, 30.8677,
-	32.7032, 34.6478, 36.7081, 38.8909, 41.2034, 43.6535, 46.2493, 48.9994, 51.9131, 55, 58.2705, 61.7354,
-	65.4064, 69.2957, 73.4162, 77.7817, 82.4069, 87.3071, 92.4986, 97.9989, 103.826, 110, 116.541, 123.471,
-	130.813, 138.591, 146.832, 155.563, 164.814, 174.614, 184.997, 195.998, 207.652, 220, 233.082, 246.942,
-	261.626, 277.183, 293.665, 311.127, 329.628, 349.228, 369.994, 391.995, 415.305, 440, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
+    6116, 5772, 5448, 5143, 4854, 4582, 4324, 4082, 3853, 3636, 3432, 3240,
+    3058, 2886, 2724, 2571, 2427, 2291, 2162, 2041, 1926, 1818, 1716, 1620,
+    1529, 1443, 1362, 1286, 1213, 1145, 1081, 1020, 963, 909, 858, 810,
+    764, 722, 681, 643, 607, 573, 541, 510, 482, 455, 429, 405,
+    382, 361, 341, 321, 303, 286, 270, 255, 241, 227, 215, 202,
+    191, 180, 170, 161, 152, 143, 135, 128, 120, 114, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
 };
+
+const uint16 MIN_NOTE_PERIOD = 114;
 
 const int CHROMATIC[] = 
 {
@@ -173,79 +175,23 @@ uint16 count_until_reversal[NUM_FLOPPIES];
 
 int main(void)
 {
-	int counter = 0;
-	
 	initializeFloppies();
 	initializeGPIO();
 	initializeInterrupts();
 	initializePIT();
 	initializeADC();
-	//uart_init(0, SYSTEM_CLOCK_KHZ, kBaud19200);
+	uart_init(0, SYSTEM_CLOCK_KHZ, kBaud19200);
 	
 	resetFloppies();
 	
 	// Enable PIT0 timer
 	MCF_PIT0_PCSR |= MCF_PIT_PCSR_EN;
 	
-	//midiLoop();
-
-    // start initial ADC conversion
-    MCF_ADC_CTRL2 = MCF_ADC_CTRL2_START1;
-
-	for (;;)
-	{
-        if ((counter++ & 0x01fffff) == 0)
-        {
-        	int adcValue;
-        	int minNoteIndex = 44;
-			int minDistance = 10;
-			int maxDistance = 60;
-			int cmPerNote = 10;
-        	int cm;
-        	
-        	// DS0 -> Pin 18 -> AN4 -> ADRSLT0
-            adcValue = MCF_ADC_ADRSLT7 >> 3;
-			cm = 1.0 / ((adcValue - 2900) / 30000.0 + .1);
-			//printf("ds0: %i\n", adcValue);
-			
-			if (cm >= minDistance && cm < maxDistance) 
-			{
-				int index = minNoteIndex +
-					(cm - minDistance) / cmPerNote;
-				//printf("note: %i\n", index);
-				setFloppyFrequency(0, NOTE_FREQUENCY[index]);
-				//setFloppyFrequency(1, NOTE_FREQUENCY[index]);
-			}
-			else 
-        	{
-        		setFloppyPeriod(0, 0);
-        		//setFloppyPeriod(1, 0);
-        	}
-        	
-        	// DS1 -> Pin 16 -> AN3 -> ADRSLT1
-            adcValue = MCF_ADC_ADRSLT5 >> 3;
-			cm = 1.0 / ((adcValue - 2900) / 30000.0 + .1);
-        	//printf("ds1: %i\n", adcValue);
-        	
-			if (cm >= minDistance && cm < maxDistance) 
-			{
-				int index = minNoteIndex +
-					(cm - minDistance) / cmPerNote;
-					
-				setFloppyFrequency(1, NOTE_FREQUENCY[index]);
-			}
-			else 
-        	{
-        		setFloppyPeriod(1, 0);
-        	}
-        	
-            // start next ADC conversion
-            MCF_ADC_CTRL2 = MCF_ADC_CTRL2_START1;
-        }
-	}
+	midiModeLoop();
+	//instrumentModeLoop();
 }
 
-void midiLoop() 
+void midiModeLoop() 
 {
 	for (;;) 
 	{
@@ -268,6 +214,67 @@ void midiLoop()
 
 			setFloppyPeriod(channel, period);
 		}
+	}
+}
+
+void instrumentModeLoop() 
+{
+	int counter = 0;
+	int adcValue;
+	int minNoteIndex = 44;
+	int minDistance = 10;
+	int maxDistance = 60;
+	int cmPerNote = 10;
+	int cm;
+	int index;
+	
+    // start initial ADC conversion
+    MCF_ADC_CTRL2 = MCF_ADC_CTRL2_START1;
+
+	for (;;)
+	{
+        if ((counter++ & 0x01fffff) == 0)
+        {
+
+        	// DS0
+            adcValue = MCF_ADC_ADRSLT7 >> 3;
+			cm = 1.0 / ((adcValue - 2900) / 30000.0 + .1);
+			//printf("ds0: %i\n", adcValue);
+			
+			if (cm >= minDistance && cm < maxDistance) 
+			{
+				index = minNoteIndex +
+					(cm - minDistance) / cmPerNote;
+				//printf("note: %i\n", index);
+				setFloppyPeriod(0, NOTE_PERIOD[index]);
+				setFloppyPeriod(1, NOTE_PERIOD[index]);
+			}
+			else 
+        	{
+        		setFloppyPeriod(0, 0);
+        		setFloppyPeriod(1, 0);
+        	}
+        	
+        	// DS1
+            adcValue = MCF_ADC_ADRSLT5 >> 3;
+			cm = 1.0 / ((adcValue - 2900) / 30000.0 + .1);
+        	//printf("ds1: %i\n", adcValue);
+        	
+			if (cm >= minDistance && cm < maxDistance) 
+			{
+				index = minNoteIndex +
+					(cm - minDistance) / cmPerNote;
+					
+				setFloppyPeriod(2, NOTE_PERIOD[index]);
+			}
+			else 
+        	{
+        		setFloppyPeriod(2, 0);
+        	}
+        	
+            // start next ADC conversion
+            MCF_ADC_CTRL2 = MCF_ADC_CTRL2_START1;
+        }
 	}
 }
 
@@ -375,7 +382,7 @@ inline void initializeFloppies()
 	for (i = 0; i < NUM_FLOPPIES; i++) 
 	{
 		step_period[i] = 0;
-		count_until_step[i] = 0;
+		count_until_step[i] = 1;
 		count_until_reversal[i] = NUM_TRACKS - 1;
 	}
 }
@@ -399,23 +406,51 @@ inline void initializeGPIO()
 		| MCF_GPIO_DDRTC_DDRTC3;
 	
 	
-	// Enable GPIO on port TA for FDD2
+	// Enable GPIO on port TA for FDD2 and SSEG0
 	MCF_GPIO_PTAPAR = 0
+		| MCF_GPIO_PTAPAR_GPT0_GPIO		// SSEG0 
+		| MCF_GPIO_PTAPAR_GPT1_GPIO		// SSEG0 
 		| MCF_GPIO_PTAPAR_GPT2_GPIO		// FDD2 direction pin
 		| MCF_GPIO_PTAPAR_GPT3_GPIO;	// FDD2 step pin
 		
 	// Set GPIO on TA to output mode
 	MCF_GPIO_DDRTA = 0
+		| MCF_GPIO_DDRTA_DDRTA0
+		| MCF_GPIO_DDRTA_DDRTA1
 		| MCF_GPIO_DDRTA_DDRTA2
 		| MCF_GPIO_DDRTA_DDRTA3;
 	
-	
-	// TODO: enable GPIO for SSEGs
-	
-	
+	// Enable GPIO on port UB for SSEG0
+	MCF_GPIO_PUBPAR = 0
+		| MCF_GPIO_PUBPAR_UTXD1_GPIO	// SSEG0 
+		| MCF_GPIO_PUBPAR_URXD1_GPIO	// SSEG0 
+		| MCF_GPIO_PUBPAR_URTS1_GPIO	// SSEG0 
+		| MCF_GPIO_PUBPAR_UCTS1_GPIO;	// SSEG0 
+		
+	// Set GPIO on UB to output mode
+	MCF_GPIO_DDRUB = 0
+		| MCF_GPIO_DDRUB_DDRUB0
+		| MCF_GPIO_DDRUB_DDRUB1
+		| MCF_GPIO_DDRUB_DDRUB2
+		| MCF_GPIO_DDRUB_DDRUB3;
+		
+	// Enable GPIO on port UB for SSEG0 and SSEG1
+	MCF_GPIO_PQSPAR = 0
+		| MCF_GPIO_PQSPAR_QSPI_DOUT_GPIO// SSEG0 
+		| MCF_GPIO_PQSPAR_QSPI_DIN_GPIO	// SSEG0 
+		| MCF_GPIO_PQSPAR_QSPI_CLK_GPIO	// SSEG0 
+		| MCF_GPIO_PQSPAR_QSPI_CS0_GPIO;// SSEG1 
+		
+	// Set GPIO on QS to output mode
+	MCF_GPIO_DDRQS = 0
+		| MCF_GPIO_DDRQS_DDRQS0
+		| MCF_GPIO_DDRQS_DDRQS1
+		| MCF_GPIO_DDRQS_DDRQS2
+		| MCF_GPIO_DDRQS_DDRQS3;
+
 	// Enable RX on UART0
     MCF_GPIO_PUAPAR = 0
-        | MCF_GPIO_PUAPAR_URXD0_URXD0;;
+        | MCF_GPIO_PUAPAR_URXD0_URXD0;
 	
 	
 	// Enable ADC on port AN for DS0 and DS1
@@ -423,13 +458,20 @@ inline void initializeGPIO()
 		| MCF_GPIO_PANPAR_AN5_AN5		// DS1 input pin
 		| MCF_GPIO_PANPAR_AN7_AN7;		// DS0 input pin
 
-
 	// Set FDDn output pins to low.
-	// TODO: set SSEGn output pins to low
 	for (i = 0; i < NUM_FLOPPIES; i++) 
 	{
 		*floppy_port[i] = 0;
 	}
+	
+	// Set SSEGn output pins
+	MCF_GPIO_PORTUB = 0;
+	MCF_GPIO_PORTTA &= ~(0
+		| MCF_GPIO_PORTTA_PORTTA2	// SSEG1 only on these
+		| MCF_GPIO_PORTTA_PORTTA3);	// two pins of TA
+	MCF_GPIO_PORTQS = 0
+		| MCF_GPIO_PORTQS_PORTQS1	// Set SSEG1 pins 1 and 2
+		| MCF_GPIO_PORTQS_PORTQS2;	// high to turn off
 }
 
 inline void initializeInterrupts() 
@@ -516,39 +558,42 @@ inline uint16 getModulus(uint16 prescaler, uint32 frequency)
 	return (uint16) modulus;
 }
 
-inline void setFloppyFrequency(uint16 floppy, float frequency)
-{
-	if (floppy < NUM_FLOPPIES) 
-	{
-		if (frequency != 0) 
-		{
-			// Disable PIT0 interrupts, update step_period, and
-			// restore interrupt mask register to previous state
-			const uint32 mask = MCF_INTC0_IMRH;
-			MCF_INTC0_IMRH |= MCF_INTC_IMRH_INT_MASK55;
-			step_period[floppy] = (uint16) (INTERRUPT_FREQUENCY / frequency + .5);
-			count_until_step[floppy] = step_period[floppy];
-			MCF_INTC0_IMRH = mask;
-		}
-		else 
-		{
-			const uint32 mask = MCF_INTC0_IMRH;
-			MCF_INTC0_IMRH |= MCF_INTC_IMRH_INT_MASK55;
-			step_period[floppy] = 0;
-			count_until_step[floppy] = 0;
-			MCF_INTC0_IMRH = mask;
-		}
-	}
-}
-
 inline void setFloppyPeriod(uint16 floppy, uint16 period) 
 {
-	if (floppy < NUM_FLOPPIES) 
+	if (floppy < NUM_FLOPPIES && period >= MIN_NOTE_PERIOD) 
 	{
+		// Disable PIT0 interrupts, update step_period, and
+		// restore interrupt mask register to previous state
 		const uint32 mask = MCF_INTC0_IMRH;
 		MCF_INTC0_IMRH |= MCF_INTC_IMRH_INT_MASK55;
 		step_period[floppy] = period;
-		//count_until_step[floppy] = step_period[floppy];
+		count_until_step[floppy] = step_period[floppy];
 		MCF_INTC0_IMRH = mask;
+	}
+}
+
+// state: sabcdefg
+// s: 0 = SSEG0, 1 = SSEG1
+// abcdefg: 0 = segment reset, 1 = segment set
+inline void setSSEG(uint8 state) 
+{
+	if (0x80 & state) 
+	{
+		// SSEG1 A
+		MCF_GPIO_PORTQS &= ~MCF_GPIO_PORTQS_PORTQS0;
+		MCF_GPIO_PORTQS |= (0x40 & state) >> 6;
+		
+		// SSEG1 BC
+		MCF_GPIO_PORTTA &= ~(0
+			| MCF_GPIO_PORTTA_PORTTA0
+			| MCF_GPIO_PORTTA_PORTTA1);
+		MCF_GPIO_PORTTA |= (0x30 & state) >> 4;
+		
+		// SSEG1 DEFG
+		MCF_GPIO_PORTUB = (uint8) (0x0F & state);
+	}
+	else
+	{
+		// SSEG0
 	}
 }

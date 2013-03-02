@@ -169,6 +169,25 @@ uint16 count_until_step[NUM_FLOPPIES];
 uint16 count_until_reversal[NUM_FLOPPIES];
 
 
+////////////////////////////////
+// SEVEN SEGMENT LED HANDLING //
+////////////////////////////////
+const uint8 SSEG_BLANK = 0;
+const uint8 SSEG_A = 0b01110111;
+const uint8 SSEG_B = 0b01111111;
+const uint8 SSEG_C = 0b01001110;
+const uint8 SSEG_D = 0b00111101;
+const uint8 SSEG_E = 0b01001111;
+const uint8 SSEG_F = 0b01000111;
+const uint8 SSEG_G = 0b01111011;
+const uint8 SSEG_FLAT = 0b00011111;
+
+uint8 sseg0digit0 = 0;
+uint8 sseg0digit1 = 0;
+uint8 sseg1digit0 = SSEG_A;
+uint8 sseg1digit1 = SSEG_FLAT;
+uint8 currentSsegDigit = 1;
+
 //////////
 // CODE //
 //////////
@@ -186,6 +205,10 @@ int main(void)
 	
 	// Enable PIT0 timer
 	MCF_PIT0_PCSR |= MCF_PIT_PCSR_EN;
+	
+	setSSEG(1, SSEG_BLANK);
+	SSEGOn(1, 0);
+	SSEGOn(1, 1);
 	
 	midiModeLoop();
 	//instrumentModeLoop();
@@ -327,6 +350,38 @@ __declspec(interrupt:0) void timerHandler(void)
 				}
 			}
 		}
+	}
+	
+	// Change currently displayed digit of SSEGs
+	if (currentSsegDigit == 0)
+	{
+		// Turn off digit 0
+		SSEGOff(0, 0);
+		SSEGOff(1, 0);
+		
+		// Set symbol to display on digit 1
+		setSSEG(0,sseg0digit1);
+		setSSEG(1, sseg1digit1);
+		
+		// Turn on digit 1
+		SSEGOn(0, 1);
+		SSEGOn(1, 1);
+		currentSsegDigit = 1;
+	}
+	else // Display digit 0
+	{
+		// Turn off digit 1
+		SSEGOff(0, 1);
+		SSEGOff(1, 1);
+		
+		// Set symbol to display on digit 0
+		setSSEG(0,sseg0digit0);
+		setSSEG(1, sseg1digit0);
+		
+		// Turn on digit 0
+		SSEGOn(0, 0);
+		SSEGOn(1, 0);
+		currentSsegDigit = 0;
 	}
 }
 
@@ -560,7 +615,8 @@ inline uint16 getModulus(uint16 prescaler, uint32 frequency)
 
 inline void setFloppyPeriod(uint16 floppy, uint16 period) 
 {
-	if (floppy < NUM_FLOPPIES && period >= MIN_NOTE_PERIOD) 
+	if (floppy < NUM_FLOPPIES &&
+		(period == 0 || period >= MIN_NOTE_PERIOD))
 	{
 		// Disable PIT0 interrupts, update step_period, and
 		// restore interrupt mask register to previous state
@@ -572,13 +628,17 @@ inline void setFloppyPeriod(uint16 floppy, uint16 period)
 	}
 }
 
-// state: sabcdefg
-// s: 0 = SSEG0, 1 = SSEG1
+// state: xabcdefg
+// x: nothing
 // abcdefg: 0 = segment reset, 1 = segment set
-inline void setSSEG(uint8 state) 
+inline void setSSEG(uint8 sseg, uint8 state) 
 {
-	if (0x80 & state) 
+	switch (sseg) 
 	{
+	case 0:
+		
+		break;
+	case 1:
 		// SSEG1 A
 		MCF_GPIO_PORTQS &= ~MCF_GPIO_PORTQS_PORTQS0;
 		MCF_GPIO_PORTQS |= (0x40 & state) >> 6;
@@ -591,9 +651,64 @@ inline void setSSEG(uint8 state)
 		
 		// SSEG1 DEFG
 		MCF_GPIO_PORTUB = (uint8) (0x0F & state);
+		break;
 	}
-	else
+}
+
+inline void SSEGOn(uint8 sseg, uint8 digit) 
+{
+	switch (sseg) 
 	{
-		// SSEG0
+	case 0:
+		switch (digit) 
+		{
+		case 0:
+			break;
+		case 1:
+			break;
+		}
+		
+		break;
+	case 1:
+		switch (digit) 
+		{
+		case 0:
+			MCF_GPIO_PORTQS &= ~MCF_GPIO_PORTQS_PORTQS2;
+			break;
+		case 1:
+			MCF_GPIO_PORTQS &= ~MCF_GPIO_PORTQS_PORTQS1;
+			break;
+		}
+		
+		break;
+	}
+}
+
+inline void SSEGOff(uint8 sseg, uint8 digit)
+{
+	switch (sseg) 
+	{
+	case 0:
+		switch (digit) 
+		{
+		case 0:
+			break;
+		case 1:
+			break;
+		}
+		
+		break;
+	case 1:
+		switch (digit) 
+		{
+		case 0:
+			MCF_GPIO_PORTQS |= MCF_GPIO_PORTQS_PORTQS2;
+			break;
+		case 1:
+			MCF_GPIO_PORTQS |= MCF_GPIO_PORTQS_PORTQS1;
+			break;
+		}
+		
+		break;
 	}
 }

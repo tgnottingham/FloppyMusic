@@ -36,6 +36,8 @@ void initializePIT();
 void initializeADC();
 uint16 getModulus(uint16 prescaler, uint32 frequency);
 void setFloppyPeriod(uint16 floppy, uint16 period);
-void setSSEG(uint8 state);
+void setSSEG(uint8 sseg, uint8 state);
+void SSEGOn(uint8 sseg, uint8 digit);
+void SSEGOff(uint8 sseg, uint8 digit);
 
 #endif

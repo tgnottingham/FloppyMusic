@@ -6,6 +6,7 @@
 #define PIT0_PRESCALER 0
 // (50000 interrupts / sec. = 20 microsecond resolution)
 #define INTERRUPT_FREQUENCY 50000
+#define NUM_CHANNELS 16
 #define NUM_FLOPPIES 3
 #define NUM_TRACKS 80
 #define RESET_FLOPPIES_MESSAGE 128
@@ -35,7 +36,7 @@ void initializeInterrupts();
 void initializePIT();
 void initializeADC();
 uint16 getModulus(uint16 prescaler, uint32 frequency);
-void setFloppyPeriod(uint16 floppy, uint16 period);
+void setFloppyPeriod(uint8 floppy, uint16 period);
 void setSSEG(uint8 sseg, uint8 state);
 void SSEGOn(uint8 sseg, uint8 digit);
 void SSEGOff(uint8 sseg, uint8 digit);

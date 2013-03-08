@@ -21,7 +21,7 @@ const uint16 NOTE_PERIOD[] =
     1529, 1443, 1362, 1286, 1213, 1145, 1081, 1020, 963, 909, 858, 810,
     764, 722, 681, 643, 607, 573, 541, 510, 482, 455, 429, 405,
     382, 361, 341, 321, 303, 286, 270, 255, 241, 227, 215, 202,
-    191, 180, 170, 161, 152, 143, 135, 128, 120, 114, 0, 0,
+    191, 180, 170, 161, 152, 143, 135, 128, 120, 114, 107, 101,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -32,79 +32,61 @@ const uint16 NOTE_PERIOD[] =
 // Hand initialize these given NOTE_PERIOD data.
 // Used in getNearestNoteIndex() and setFloppyPeriod().
 const uint16 MIN_NOTE_INDEX = 1;
-const uint16 MAX_NOTE_INDEX = 70;
-const uint16 MIN_NOTE_PERIOD = 114;
+const uint16 MAX_NOTE_INDEX = 72;	// Post pitchbend
+const uint16 MIN_NOTE_PERIOD = 101;	// Post pitchbend
 
 const int CHROMATIC[] = 
 {
-	0,
 	37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
-	49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
 	61,
 };
 
 const int IONIAN[] =
 {
-	0,
 	37, 39, 41, 42, 44, 46, 48,
-	49, 51, 53, 54, 56, 58, 60,
-	61,
+	49,
 };
 
 const int DORIAN[] = 
 {
-	0,
 	37, 39, 40, 42, 44, 46, 47,
-	49, 51, 52, 54, 56, 58, 59,
-	61,
+	49,
 };
 
 const int PHRYGIAN[] = 
 {
-	0,
 	37, 38, 40, 42, 44, 45, 47,
-	49, 50, 52, 54, 56, 57, 59,
-	61,
+	49,
 };
 
 const int LYDIAN[] = 
 {
-	0,
 	37, 39, 41, 43, 44, 46, 48,
-	49, 51, 53, 55, 56, 58, 60,
-	61,
+	49,
 };
 
 const int MIXOLYDIAN[] = 
 {
-	0,
 	37, 39, 41, 42, 44, 46, 47,
-	49, 51, 53, 54, 56, 58, 59,
-	61,
+	49,
 };
 
 const int AEOLIAN[] = 
 {
-	0,
 	37, 39, 40, 42, 44, 45, 47,
-	49, 51, 52, 54, 56, 57, 59,
-	61,
+	49,
 };
 
 const int LOCRIAN[] = 
 {
-	0,
 	37, 38, 40, 42, 43, 45, 47,
-	49, 50, 52, 54, 55, 57, 59,
-	61,
+	49,
 };
 
 const int BLUES[] = 
 {
-	0,
 	37, 40, 42, 43, 44, 47,
-	49, 52, 54, 55, 56, 59,
-	61,
+	49,
 };
 
 const int* SCALE[] =
@@ -115,9 +97,12 @@ const int* SCALE[] =
 
 const int SCALE_SIZE[] =
 {
-	26, 16, 16, 16, 16, 16, 16, 16, 14,
+	14, 9, 9, 9, 9, 9, 9, 9, 8,
 };
 
+const int NUM_SCALES = 9;
+
+int current_scale = 0;
 
 /////////////////////
 // FLOPPY HANDLING //
@@ -150,7 +135,7 @@ const uint16 RESET_STEP_PERIOD = (int) (INTERRUPT_FREQUENCY / 240.0 + .5);
 // The MIDI channel associated with each FDD.
 uint8 floppy_to_channel[NUM_FLOPPIES] =
 {
-	1, 2, 3, 
+	1, 2, 0, 
 };
 
 // The floppy associated with each MIDI channel.
@@ -218,8 +203,8 @@ uint8 sseg1digit0 = 0;
 uint8 sseg1digit1 = 0;
 uint8 currentSsegDigit = 0;
 
-uint8 sseg0_floppy = 0;
-uint8 sseg1_floppy = 1;
+uint8 sseg0_floppy = 1;
+uint8 sseg1_floppy = 0;
 
 //////////
 // CODE //
@@ -241,12 +226,6 @@ int main(void)
 	
 	midiModeLoop();
 	//instrumentModeLoop();
-	
-	for (;;)
-	{
-		int counter = 0;
-		counter++;
-	}
 }
 
 void midiModeLoop() 
@@ -300,12 +279,12 @@ void midiModeLoop()
 				if (channel == floppy_to_channel[sseg0_floppy]) 
 				{
 					sseg0digit0 = SSEG_DIGIT0_SYMBOLS[nearestNoteNumberMod12];
-					sseg0digit1 = SSEG_DIGIT1_SYMBOLS[nearestNoteNumberMod12];;
+					sseg0digit1 = SSEG_DIGIT1_SYMBOLS[nearestNoteNumberMod12];
 				}
 				else if (channel == floppy_to_channel[sseg1_floppy]) 
 				{
-					sseg1digit0 = SSEG_DIGIT0_SYMBOLS[nearestNoteNumberMod12];;
-					sseg1digit1 = SSEG_DIGIT1_SYMBOLS[nearestNoteNumberMod12];;
+					sseg1digit0 = SSEG_DIGIT0_SYMBOLS[nearestNoteNumberMod12];
+					sseg1digit1 = SSEG_DIGIT1_SYMBOLS[nearestNoteNumberMod12];
 				}
 			}
 		}
@@ -314,63 +293,84 @@ void midiModeLoop()
 
 void instrumentModeLoop() 
 {
+	uint8 nearestNoteNumberMod12;
 	int counter = 0;
 	int adcValue;
-	int minNoteIndex = 44;
 	int minDistance = 10;
-	int maxDistance = 60;
-	int cmPerNote = 10;
+	int cmPerNote = 5;
+	int maxDistance = minDistance + cmPerNote * SCALE_SIZE[current_scale];
 	int cm;
 	int index;
+	int i;
+	int j;
 	
     // start initial ADC conversion
     MCF_ADC_CTRL2 = MCF_ADC_CTRL2_START1;
 
 	for (;;)
 	{
-        if ((counter++ & 0x01fffff) == 0)
-        {
+		adcValue = 0;
+		
+		for (i = 0; i < 8; i++) 
+		{
+			for (j = 0; j < 0x0ffff; j++)
+	        {
+				counter++;	// dumb delay
+	        }
+	        
+		    // DS0
+	        adcValue += MCF_ADC_ADRSLT7 >> 3;
+	        // start next ADC conversion
+	        MCF_ADC_CTRL2 = MCF_ADC_CTRL2_START1;
+		}
+		
 
-        	// DS0
-            adcValue = MCF_ADC_ADRSLT7 >> 3;
-			cm = 1.0 / ((adcValue - 2900) / 30000.0 + .1);
-			//printf("ds0: %i\n", adcValue);
+		adcValue /= 8;
+		cm = 1.0 / ((adcValue - 2900) / 27000.0 + .1);
+		//printf("%d\n", adcValue);
+		//printf("%d\n", cm);
+		// (1 / 10cm, 2900, 1 / 30cm, 1100) -> slope = 27000
+		
+		
+		if (cm >= minDistance && cm < maxDistance) 
+		{
 			
-			if (cm >= minDistance && cm < maxDistance) 
-			{
-				index = minNoteIndex +
-					(cm - minDistance) / cmPerNote;
-				//printf("note: %i\n", index);
-				setFloppyPeriod(0, NOTE_PERIOD[index]);
-				setFloppyPeriod(1, NOTE_PERIOD[index]);
-			}
-			else 
-        	{
-        		setFloppyPeriod(0, 0);
-        		setFloppyPeriod(1, 0);
-        	}
-        	
-        	// DS1
-            adcValue = MCF_ADC_ADRSLT5 >> 3;
-			cm = 1.0 / ((adcValue - 2900) / 30000.0 + .1);
-        	//printf("ds1: %i\n", adcValue);
-        	
-			if (cm >= minDistance && cm < maxDistance) 
-			{
-				index = minNoteIndex +
-					(cm - minDistance) / cmPerNote;
-					
-				setFloppyPeriod(2, NOTE_PERIOD[index]);
-			}
-			else 
-        	{
-        		setFloppyPeriod(2, 0);
-        	}
-        	
-            // start next ADC conversion
-            MCF_ADC_CTRL2 = MCF_ADC_CTRL2_START1;
-        }
-	}
+			index = (cm - minDistance) / cmPerNote;
+			//printf("note: %i\n", index);
+			setFloppyPeriod(0, NOTE_PERIOD[SCALE[current_scale][index]]);
+			setFloppyPeriod(1, NOTE_PERIOD[SCALE[current_scale][index]]);
+			
+			nearestNoteNumberMod12 = (uint8) ((SCALE[current_scale][index] - 1) % 12);
+			
+			sseg1digit0 = SSEG_DIGIT0_SYMBOLS[nearestNoteNumberMod12];
+			sseg1digit1 = SSEG_DIGIT1_SYMBOLS[nearestNoteNumberMod12];
+		}
+		else 
+    	{
+    		setFloppyPeriod(0, 0);
+    		setFloppyPeriod(1, 0);
+			sseg1digit0 = SSEG_BLANK;
+			sseg1digit1 = SSEG_BLANK;
+    	}
+    	
+    	/*
+    	// DS1
+        adcValue = MCF_ADC_ADRSLT5 >> 3;
+		cm = 1.0 / ((adcValue - 2900) / 30000.0 + .1);
+    	//printf("ds1: %i\n", adcValue);
+    	
+		if (cm >= minDistance && cm < maxDistance) 
+		{
+			index = (cm - minDistance) / cmPerNote;
+				
+			setFloppyPeriod(2, NOTE_PERIOD[index]);
+		}
+		else 
+    	{
+    		setFloppyPeriod(2, 0);
+    	}
+    	*/
+    }
 }
 
 __declspec(interrupt:0) void timerHandler(void) 
@@ -459,6 +459,13 @@ __declspec(interrupt:0) void timerHandler(void)
 		SSEGOn(1, 0);
 		currentSsegDigit = 0;
 	}
+}
+
+__declspec(interrupt:0) void sw2Handler(void) 
+{
+	MCF_INTC0_IPRL &= ~MCF_INTC0_ICR01;
+	
+	current_scale = (current_scale + 1) % NUM_SCALES;
 }
 
 // Pulls floppy read heads to back of drive
@@ -635,6 +642,27 @@ inline void initializeInterrupts()
 		
 	// Enable interrupts on source 55
 	MCF_INTC0_IMRH &= ~MCF_INTC_IMRH_INT_MASK55;
+	
+	
+	
+	
+	
+	/* Enable IRQ signals on the port */
+	MCF_GPIO_PNQPAR = 0
+	  | MCF_GPIO_PNQPAR_IRQ1_IRQ1;
+
+	/* Set EPORT to look for rising edges */
+	MCF_EPORT0_EPPAR = 0
+	  | MCF_EPORT_EPPAR_EPPA1_RISING;
+	  
+	/* Clear any currently triggered events on the EPORT  */
+	MCF_EPORT0_EPIER = 0
+	  | MCF_EPORT_EPIER_EPIE1;
+	 
+	/* Enable interrupts in the interrupt controller */
+	MCF_INTC0_IMRL &= ~(0
+	  | MCF_INTC_IMRL_INT_MASK1
+	  | MCF_INTC_IMRL_MASKALL);
 }
 
 inline void initializePIT() 

@@ -29,6 +29,7 @@
 void midiModeLoop();
 void instrumentModeLoop();
 __declspec(interrupt:0) void timerHandler(void);
+__declspec(interrupt:0) void sw2Handler(void);
 void resetFloppies();
 void initializeFloppies();
 void initializeGPIO();

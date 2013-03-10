@@ -197,14 +197,10 @@ const uint8 SSEG_DIGIT1_SYMBOLS[] =
 	SSEG_BLANK, SSEG_FLAT, SSEG_BLANK
 };
 
+uint8 sseg0_floppy = 1;
 uint8 sseg0digit0 = 0;
 uint8 sseg0digit1 = 0;
-uint8 sseg1digit0 = 0;
-uint8 sseg1digit1 = 0;
 uint8 currentSsegDigit = 0;
-
-uint8 sseg0_floppy = 1;
-uint8 sseg1_floppy = 0;
 
 //////////
 // CODE //
@@ -224,8 +220,8 @@ int main(void)
 	// Enable PIT0 timer
 	MCF_PIT0_PCSR |= MCF_PIT_PCSR_EN;
 	
-	midiModeLoop();
-	//instrumentModeLoop();
+	//midiModeLoop();
+	instrumentModeLoop();
 }
 
 void midiModeLoop() 
@@ -237,7 +233,7 @@ void midiModeLoop()
 	uint8 nearestNoteIndex;
 	uint8 nearestNoteNumberMod12;
 	
-	for (;;) 
+	for (;;)
 	{
 		channel = uart_getchar(0);
 		
@@ -245,8 +241,6 @@ void midiModeLoop()
 		{
 			sseg0digit0 = SSEG_BLANK;
 			sseg0digit1 = SSEG_BLANK;
-			sseg1digit0 = SSEG_BLANK;
-			sseg1digit1 = SSEG_BLANK;
 			
 			resetFloppies();
 		}
@@ -265,11 +259,6 @@ void midiModeLoop()
 					sseg0digit0 = SSEG_BLANK;
 					sseg0digit1 = SSEG_BLANK;
 				}
-				else if (channel == floppy_to_channel[sseg1_floppy]) 
-				{
-					sseg1digit0 = SSEG_BLANK;
-					sseg1digit1 = SSEG_BLANK;
-				}
 			}
 			else
 			{
@@ -280,11 +269,6 @@ void midiModeLoop()
 				{
 					sseg0digit0 = SSEG_DIGIT0_SYMBOLS[nearestNoteNumberMod12];
 					sseg0digit1 = SSEG_DIGIT1_SYMBOLS[nearestNoteNumberMod12];
-				}
-				else if (channel == floppy_to_channel[sseg1_floppy]) 
-				{
-					sseg1digit0 = SSEG_DIGIT0_SYMBOLS[nearestNoteNumberMod12];
-					sseg1digit1 = SSEG_DIGIT1_SYMBOLS[nearestNoteNumberMod12];
 				}
 			}
 		}
@@ -297,34 +281,33 @@ void instrumentModeLoop()
 	int counter = 0;
 	int adcValue;
 	int minDistance = 10;
-	int cmPerNote = 5;
+	int cmPerNote = 6;
 	int maxDistance = minDistance + cmPerNote * SCALE_SIZE[current_scale];
 	int cm;
 	int index;
 	int i;
 	int j;
 	
-    // start initial ADC conversion
-    MCF_ADC_CTRL2 = MCF_ADC_CTRL2_START1;
-
 	for (;;)
 	{
 		adcValue = 0;
 		
+		// Take a few samples and average them
 		for (i = 0; i < 8; i++) 
 		{
+	        // Start ADC conversion
+	        MCF_ADC_CTRL1 = MCF_ADC_CTRL1_START0;
+	        
+	        // Delay before reading result
 			for (j = 0; j < 0x0ffff; j++)
 	        {
-				counter++;	// dumb delay
+				counter++;
 	        }
 	        
-		    // DS0
-	        adcValue += MCF_ADC_ADRSLT7 >> 3;
-	        // start next ADC conversion
-	        MCF_ADC_CTRL2 = MCF_ADC_CTRL2_START1;
+		    // Read result
+	        adcValue += MCF_ADC_ADRSLT0 >> 3;
 		}
 		
-
 		adcValue /= 8;
 		cm = 1.0 / ((adcValue - 2900) / 27000.0 + .1);
 		//printf("%d\n", adcValue);
@@ -336,21 +319,21 @@ void instrumentModeLoop()
 		{
 			
 			index = (cm - minDistance) / cmPerNote;
-			//printf("note: %i\n", index);
+
 			setFloppyPeriod(0, NOTE_PERIOD[SCALE[current_scale][index]]);
 			setFloppyPeriod(1, NOTE_PERIOD[SCALE[current_scale][index]]);
 			
 			nearestNoteNumberMod12 = (uint8) ((SCALE[current_scale][index] - 1) % 12);
 			
-			sseg1digit0 = SSEG_DIGIT0_SYMBOLS[nearestNoteNumberMod12];
-			sseg1digit1 = SSEG_DIGIT1_SYMBOLS[nearestNoteNumberMod12];
+			sseg0digit0 = SSEG_DIGIT0_SYMBOLS[nearestNoteNumberMod12];
+			sseg0digit1 = SSEG_DIGIT1_SYMBOLS[nearestNoteNumberMod12];
 		}
 		else 
     	{
     		setFloppyPeriod(0, 0);
     		setFloppyPeriod(1, 0);
-			sseg1digit0 = SSEG_BLANK;
-			sseg1digit1 = SSEG_BLANK;
+			sseg0digit0 = SSEG_BLANK;
+			sseg0digit1 = SSEG_BLANK;
     	}
     	
     	/*
@@ -430,16 +413,13 @@ __declspec(interrupt:0) void timerHandler(void)
 		// Time to display digit 1...
 		
 		// Turn off digit 0
-		SSEGOff(0, 0);
-		SSEGOff(1, 0);
+		SSEGOff(0);
 		
 		// Set symbol to display on digit 1
-		setSSEG(0,sseg0digit1);
-		setSSEG(1, sseg1digit1);
+		setSSEG(sseg0digit1);
 		
 		// Turn on digit 1
-		SSEGOn(0, 1);
-		SSEGOn(1, 1);
+		SSEGOn(1);
 		currentSsegDigit = 1;
 	}
 	else
@@ -447,24 +427,23 @@ __declspec(interrupt:0) void timerHandler(void)
 		// Time to display digit 0...
 		
 		// Turn off digit 1
-		SSEGOff(0, 1);
-		SSEGOff(1, 1);
-		
+		SSEGOff(1);
+
 		// Set symbol to display on digit 0
-		setSSEG(0,sseg0digit0);
-		setSSEG(1, sseg1digit0);
+		setSSEG(sseg0digit0);
 		
 		// Turn on digit 0
-		SSEGOn(0, 0);
-		SSEGOn(1, 0);
+		SSEGOn(0);
 		currentSsegDigit = 0;
 	}
 }
 
 __declspec(interrupt:0) void sw2Handler(void) 
 {
-	MCF_INTC0_IPRL &= ~MCF_INTC0_ICR01;
+	// Clear interrupt
+	MCF_EPORT0_EPFR = MCF_EPORT_EPFR_EPF1;
 	
+	// Change scale
 	current_scale = (current_scale + 1) % NUM_SCALES;
 }
 
@@ -553,10 +532,10 @@ inline void initializeGPIO()
 		| MCF_GPIO_DDRTC_DDRTC3;
 	
 	
-	// Enable GPIO on port TA for FDD2 and SSEG1
+	// Enable GPIO on port TA for FDD2 and SSEG0
 	MCF_GPIO_PTAPAR = 0
-		| MCF_GPIO_PTAPAR_GPT0_GPIO		// SSEG1 
-		| MCF_GPIO_PTAPAR_GPT1_GPIO		// SSEG1 
+		| MCF_GPIO_PTAPAR_GPT0_GPIO		// SSEG0 C
+		| MCF_GPIO_PTAPAR_GPT1_GPIO		// SSEG0 B
 		| MCF_GPIO_PTAPAR_GPT2_GPIO		// FDD2 direction pin
 		| MCF_GPIO_PTAPAR_GPT3_GPIO;	// FDD2 step pin
 		
@@ -568,12 +547,12 @@ inline void initializeGPIO()
 		| MCF_GPIO_DDRTA_DDRTA3;
 	
 	
-	// Enable GPIO on port UB for SSEG1
+	// Enable GPIO on port UB for SSEG0
 	MCF_GPIO_PUBPAR = 0
-		| MCF_GPIO_PUBPAR_UTXD1_GPIO	// SSEG1 
-		| MCF_GPIO_PUBPAR_URXD1_GPIO	// SSEG1 
-		| MCF_GPIO_PUBPAR_URTS1_GPIO	// SSEG1 
-		| MCF_GPIO_PUBPAR_UCTS1_GPIO;	// SSEG1 
+		| MCF_GPIO_PUBPAR_UTXD1_GPIO	// SSEG0 G
+		| MCF_GPIO_PUBPAR_URXD1_GPIO	// SSEG0 F
+		| MCF_GPIO_PUBPAR_URTS1_GPIO	// SSEG0 E
+		| MCF_GPIO_PUBPAR_UCTS1_GPIO;	// SSEG0 D
 		
 	// Set GPIO on UB to output mode
 	MCF_GPIO_DDRUB = 0
@@ -582,19 +561,17 @@ inline void initializeGPIO()
 		| MCF_GPIO_DDRUB_DDRUB2
 		| MCF_GPIO_DDRUB_DDRUB3;
 		
-	// Enable GPIO on port QS for SSEG0 and SSEG1
+	// Enable GPIO on port QS for SSEG0
 	MCF_GPIO_PQSPAR = 0
-		| MCF_GPIO_PQSPAR_QSPI_DOUT_GPIO// SSEG1 
-		| MCF_GPIO_PQSPAR_QSPI_DIN_GPIO	// SSEG1 
-		| MCF_GPIO_PQSPAR_QSPI_CLK_GPIO	// SSEG1 
-		| MCF_GPIO_PQSPAR_QSPI_CS0_GPIO;// SSEG0 
+		| MCF_GPIO_PQSPAR_QSPI_DOUT_GPIO// SSEG0 A
+		| MCF_GPIO_PQSPAR_QSPI_DIN_GPIO	// SSEG0 DIG1
+		| MCF_GPIO_PQSPAR_QSPI_CLK_GPIO;// SSEG0 DIG0
 		
 	// Set GPIO on QS to output mode
 	MCF_GPIO_DDRQS = 0
 		| MCF_GPIO_DDRQS_DDRQS0
 		| MCF_GPIO_DDRQS_DDRQS1
-		| MCF_GPIO_DDRQS_DDRQS2
-		| MCF_GPIO_DDRQS_DDRQS3;
+		| MCF_GPIO_DDRQS_DDRQS2;
 
 
 	// Enable RX on UART0
@@ -604,9 +581,8 @@ inline void initializeGPIO()
 	
 	// Enable ADC on port AN for DS0 and DS1
 	MCF_GPIO_PANPAR = 0
-		| MCF_GPIO_PANPAR_AN5_AN5		// DS1 input pin
-		| MCF_GPIO_PANPAR_AN7_AN7;		// DS0 input pin
-
+		| MCF_GPIO_PANPAR_AN0_AN0		// DS0 input pin
+		| MCF_GPIO_PANPAR_AN1_AN1;		// DS1 input pin
 
 	// Set FDDn output pins to low.
 	for (i = 0; i < NUM_FLOPPIES; i++) 
@@ -616,12 +592,9 @@ inline void initializeGPIO()
 	
 	
 	// Turn off SSEGs and set state to blank
-	SSEGOff(0, 0);
-	SSEGOff(0, 1);
-	SSEGOff(1, 0);
-	SSEGOff(1, 1);
-	setSSEG(0, 0);
-	setSSEG(1, 0);
+	SSEGOff(0);
+	SSEGOff(1);
+	setSSEG(0);
 }
 
 inline void initializeInterrupts() 
@@ -642,24 +615,24 @@ inline void initializeInterrupts()
 		
 	// Enable interrupts on source 55
 	MCF_INTC0_IMRH &= ~MCF_INTC_IMRH_INT_MASK55;
+	 
 	
-	
-	
-	
-	
-	/* Enable IRQ signals on the port */
+	// Enable interrupts from EPORT pin 1 (SW2)
+	MCF_EPORT0_EPIER = 0
+	  | MCF_EPORT_EPIER_EPIE1;
+	  
+	// Enable IRQ signals on the port
 	MCF_GPIO_PNQPAR = 0
 	  | MCF_GPIO_PNQPAR_IRQ1_IRQ1;
 
-	/* Set EPORT to look for rising edges */
+	// Set EPORT to look for rising edges
 	MCF_EPORT0_EPPAR = 0
 	  | MCF_EPORT_EPPAR_EPPA1_RISING;
-	  
-	/* Clear any currently triggered events on the EPORT  */
-	MCF_EPORT0_EPIER = 0
-	  | MCF_EPORT_EPIER_EPIE1;
+	
+	// Clear any existing interrupt flags from EPORT pin 1
+ 	MCF_EPORT0_EPFR = MCF_EPORT_EPFR_EPF1;
 	 
-	/* Enable interrupts in the interrupt controller */
+	// Unmask interrupt in the interrupt controller
 	MCF_INTC0_IMRL &= ~(0
 	  | MCF_INTC_IMRL_INT_MASK1
 	  | MCF_INTC_IMRL_MASKALL);
@@ -688,22 +661,10 @@ inline void initializeADC()
 	// Scanning two samples in this mode takes
 	// 1.7 + 1.2 = 3.9 microseconds.
 	// (1st sample + 2nd sample)
-	MCF_ADC_CTRL1 = 1;
-	MCF_ADC_CTRL2 = 0x0002;
+	MCF_ADC_CTRL1 = 0;
 	
-	// Enable scanning of distance sensor 0 (DS0) on
-	// pin AN4 and distance sensor 1 (DS1) on pin AN3
-	// RSLT0 will be scan result for DS0
-	// RSLT1 will be scan result for DS1
-	//MCF_ADC_ADLST1 = 0
-	//	| MCF_ADC_ADLST1_SAMPLE0(0);
-		
-	MCF_ADC_ADLST2 = 0
-		| MCF_ADC_ADLST2_SAMPLE5(5)
-		| MCF_ADC_ADLST2_SAMPLE7(7);
-	
-	// Disable scanning for all other samples
-	//MCF_ADC_ADSDIS = MCF_ADC_ADSDIS_DS2;
+	// Only scan the first two pins
+	MCF_ADC_ADSDIS = MCF_ADC_ADSDIS_DS2;
 	
 	// Power up ADCs with a 0x0d ADC clock cycle delay.
 	// Disable auto standby and auto power-down modes.
@@ -746,89 +707,51 @@ inline void setFloppyPeriod(uint8 floppy, uint16 period)
 // state: xabcdefg
 // x: nothing
 // abcdefg: 0 = segment reset, 1 = segment set
-inline void setSSEG(uint8 sseg, uint8 state) 
+inline void setSSEG(uint8 state) 
 {
-	switch (sseg) 
+	// SSEG0 A
+	// Clear old state for A
+	MCF_GPIO_PORTQS &= ~MCF_GPIO_PORTQS_PORTQS0;
+	
+	// Set new state for A
+	MCF_GPIO_PORTQS |= (0x40 & state) >> 6;
+	
+	// SSEG0 BC
+	// Clear old state for BC
+	MCF_GPIO_PORTTA &= ~(0
+		| MCF_GPIO_PORTTA_PORTTA0
+		| MCF_GPIO_PORTTA_PORTTA1);
+		
+	// Set new state for BC
+	MCF_GPIO_PORTTA |= (0x30 & state) >> 4;
+	
+	// SSEG0 DEFG
+	// Set new state for DEFG
+	MCF_GPIO_PORTUB = (uint8) (0x0F & state);
+}
+
+inline void SSEGOn(uint8 digit) 
+{
+	switch (digit)
 	{
 	case 0:
-		
+		MCF_GPIO_PORTQS |= MCF_GPIO_PORTQS_PORTQS2;
 		break;
 	case 1:
-		// SSEG1 A
-		// Clear old state for A
-		MCF_GPIO_PORTQS &= ~MCF_GPIO_PORTQS_PORTQS0;
-		// Set new state for A
-		MCF_GPIO_PORTQS |= (0x40 & state) >> 6;
-		
-		// SSEG1 BC
-		// Clear old state for BC
-		MCF_GPIO_PORTTA &= ~(0
-			| MCF_GPIO_PORTTA_PORTTA0
-			| MCF_GPIO_PORTTA_PORTTA1);
-		// Set new state for BC
-		MCF_GPIO_PORTTA |= (0x30 & state) >> 4;
-		
-		// SSEG1 DEFG
-		// Set new state for DEFG
-		MCF_GPIO_PORTUB = (uint8) (0x0F & state);
+		MCF_GPIO_PORTQS |= MCF_GPIO_PORTQS_PORTQS1;
 		break;
 	}
 }
 
-inline void SSEGOn(uint8 sseg, uint8 digit) 
+inline void SSEGOff(uint8 digit)
 {
-	switch (sseg) 
+	switch (digit)
 	{
 	case 0:
-		switch (digit) 
-		{
-		case 0:
-			break;
-		case 1:
-			break;
-		}
-		
+		MCF_GPIO_PORTQS &= ~MCF_GPIO_PORTQS_PORTQS2;
 		break;
 	case 1:
-		switch (digit) 
-		{
-		case 0:
-			MCF_GPIO_PORTQS |= MCF_GPIO_PORTQS_PORTQS2;
-			break;
-		case 1:
-			MCF_GPIO_PORTQS |= MCF_GPIO_PORTQS_PORTQS1;
-			break;
-		}
-		
-		break;
-	}
-}
-
-inline void SSEGOff(uint8 sseg, uint8 digit)
-{
-	switch (sseg) 
-	{
-	case 0:
-		switch (digit) 
-		{
-		case 0:
-			break;
-		case 1:
-			break;
-		}
-		
-		break;
-	case 1:
-		switch (digit) 
-		{
-		case 0:
-			MCF_GPIO_PORTQS &= ~MCF_GPIO_PORTQS_PORTQS2;
-			break;
-		case 1:
-			MCF_GPIO_PORTQS &= ~MCF_GPIO_PORTQS_PORTQS1;
-			break;
-		}
-		
+		MCF_GPIO_PORTQS &= ~MCF_GPIO_PORTQS_PORTQS1;
 		break;
 	}
 }

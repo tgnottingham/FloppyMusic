@@ -7,7 +7,7 @@
 // (50000 interrupts / sec. = 20 microsecond resolution)
 #define INTERRUPT_FREQUENCY 50000
 #define NUM_CHANNELS 16
-#define NUM_FLOPPIES 3
+#define NUM_FLOPPIES 8
 #define NUM_TRACKS 80
 #define RESET_FLOPPIES_MESSAGE 128
 
@@ -25,6 +25,31 @@
 #define FDD2 ((vuint8*) (0x4010000E))
 #define FDD2_DIRECTION (0x4)
 #define FDD2_STEP (0x8)
+
+// FDD3 = PORTAS
+#define FDD3 ((vuint8*) (0x4010000B))
+#define FDD3_DIRECTION (0x1)
+#define FDD3_STEP (0x2)
+
+// FDD4 = PORTAN
+#define FDD4 ((vuint8*) (0x4010000A))
+#define FDD4_DIRECTION (0x40)
+#define FDD4_STEP (0x80)
+
+// FDD5 = PORTAN
+#define FDD5 ((vuint8*) (0x4010000A))
+#define FDD5_DIRECTION (0x10)
+#define FDD5_STEP (0x20)
+
+// FDD6 = PORTAN
+#define FDD6 ((vuint8*) (0x4010000A))
+#define FDD6_DIRECTION (0x04)
+#define FDD6_STEP (0x08)
+
+// FDD7 = PORTAS
+#define FDD7 ((vuint8*) (0x4010000B))
+#define FDD7_DIRECTION (0x8)
+#define FDD7_STEP (0x4)
 
 void midiModeLoop();
 void instrumentModeLoop();

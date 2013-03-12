@@ -371,13 +371,13 @@ __declspec(vectortable) vectorTableEntryType _vect[256] = {   /* Interrupt vecto
    asm_exception_handler,           /*  62 (0x0F8) Reserved                   */
    asm_exception_handler,           /*  63 (0x0FC) Reserved                   */
    asm_exception_handler,           /*  64 (0x100) Device-specific interrupts */
-   sw2Handler,           			/*  65 (0x104) Device-specific interrupts */
+   asm_exception_handler,           /*  65 (0x104) Device-specific interrupts */
    asm_exception_handler,           /*  66 (0x108) Device-specific interrupts */
    asm_exception_handler,           /*  67 (0x10C) Device-specific interrupts */
    asm_exception_handler,           /*  68 (0x110) Device-specific interrupts */
    asm_exception_handler,           /*  69 (0x114) Device-specific interrupts */
    asm_exception_handler,           /*  70 (0x118) Device-specific interrupts */
-   asm_exception_handler,           /*  71 (0x11C) Device-specific interrupts */
+   sw1Handler,        			    /*  71 (0x11C) Device-specific interrupts */
    asm_exception_handler,           /*  72 (0x120) Device-specific interrupts */
    asm_exception_handler,           /*  73 (0x124) Device-specific interrupts */
    asm_exception_handler,           /*  74 (0x128) Device-specific interrupts */

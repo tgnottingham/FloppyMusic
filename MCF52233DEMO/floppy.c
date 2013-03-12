@@ -122,7 +122,7 @@ uint8 max_distance;	// Initialized in instrumentModeLoop()
 // The GPIO port for each floppy (see floppy.h).
 vuint8* floppy_port[NUM_FLOPPIES] =
 {
-	FDD0, FDD1, FDD2, FDD3, FDD4, FDD5, FDD6, FDD7, 
+	FDD0, FDD1, FDD2, FDD3, FDD4, FDD5, //FDD6, FDD7, 
 };
 
 // The value to OR into a floppy's GPIO port
@@ -130,7 +130,7 @@ vuint8* floppy_port[NUM_FLOPPIES] =
 const uint8 FLOPPY_STEP_BIT[NUM_FLOPPIES] = 
 {
 	FDD0_STEP, FDD1_STEP, FDD2_STEP, FDD3_STEP, 
-	FDD4_STEP, FDD5_STEP, FDD6_STEP, FDD7_STEP, 
+	FDD4_STEP, FDD5_STEP, //FDD6_STEP, FDD7_STEP, 
 };
 
 // The value to OR into a floppy's GPIO port
@@ -138,7 +138,7 @@ const uint8 FLOPPY_STEP_BIT[NUM_FLOPPIES] =
 const uint8 FLOPPY_DIRECTION_BIT[NUM_FLOPPIES] = 
 {
 	FDD0_DIRECTION, FDD1_DIRECTION, FDD2_DIRECTION, FDD3_DIRECTION, 
-	FDD4_DIRECTION, FDD5_DIRECTION, FDD6_DIRECTION, FDD7_DIRECTION, 
+	FDD4_DIRECTION, FDD5_DIRECTION, //FDD6_DIRECTION, FDD7_DIRECTION, 
 };
 
 // Number of interrupts between pulsing stepper motor
@@ -148,7 +148,7 @@ const uint16 RESET_STEP_PERIOD = (int) (INTERRUPT_FREQUENCY / 240.0 + .5);
 // The MIDI channel associated with each FDD.
 uint8 floppy_to_channel[NUM_FLOPPIES] =
 {
-	7, 5, 2, 3, 4, 5, 6, 7, 
+    0,1,2,3,2,3,//6,7,
 };
 
 // Counts down from NUM_TRACKS - 1 to 0 while drive
@@ -347,7 +347,6 @@ void instrumentModeLoop()
 			setFloppyPeriod(0, NOTE_PERIOD[SCALE[current_scale][note_index]]);
 			setFloppyPeriod(1, NOTE_PERIOD[SCALE[current_scale][note_index]]);
 			setFloppyPeriod(2, NOTE_PERIOD[SCALE[current_scale][note_index]]);
-			setFloppyPeriod(3, NOTE_PERIOD[SCALE[current_scale][note_index]]);
 
 			nearest_note_mod12 = (uint8) ((SCALE[current_scale][note_index] - 1) % 12);
 			
@@ -359,7 +358,6 @@ void instrumentModeLoop()
     		setFloppyPeriod(0, 0);
     		setFloppyPeriod(1, 0);
     		setFloppyPeriod(2, 0);
-    		setFloppyPeriod(3, 0);
     		
 			sseg0_digit0 = SSEG_BLANK;
 			sseg0_digit1 = SSEG_BLANK;
@@ -371,18 +369,16 @@ void instrumentModeLoop()
 		{
 			note_index = (uint8) ((cm - MIN_DISTANCE) / CM_PER_NOTE);
 
+			setFloppyPeriod(3, NOTE_PERIOD[SCALE[current_scale][note_index]]);
 			setFloppyPeriod(4, NOTE_PERIOD[SCALE[current_scale][note_index]]);
 			setFloppyPeriod(5, NOTE_PERIOD[SCALE[current_scale][note_index]]);
-			setFloppyPeriod(6, NOTE_PERIOD[SCALE[current_scale][note_index]]);
-			setFloppyPeriod(7, NOTE_PERIOD[SCALE[current_scale][note_index]]);
 		}
 		else 
     	{
+    		setFloppyPeriod(3, 0);
     		setFloppyPeriod(4, 0);
     		setFloppyPeriod(5, 0);
-    		setFloppyPeriod(6, 0);
-    		setFloppyPeriod(7, 0);
-    	}
+       	}
     }
 }
 
@@ -468,10 +464,10 @@ __declspec(interrupt:0) void timerHandler(void)
 	}
 }
 
-__declspec(interrupt:0) void sw2Handler(void) 
+__declspec(interrupt:0) void sw1Handler(void) 
 {
 	// Clear interrupt
-	MCF_EPORT0_EPFR = MCF_EPORT_EPFR_EPF1;
+	MCF_EPORT0_EPFR = MCF_EPORT_EPFR_EPF7;
 	
 	// Change scale
 	current_scale = (uint8) ((current_scale + 1) % NUM_SCALES);
@@ -587,12 +583,12 @@ inline void initializeGPIO()
 		| MCF_GPIO_DDRUB_DDRUB3;
 	
 	
-	// Enable GPIO on port QS for SSEG0
+	// Enable GPIO on port QS for SSEG0 and LED
 	MCF_GPIO_PQSPAR = 0
 		| MCF_GPIO_PQSPAR_QSPI_DOUT_GPIO// SSEG0 A
 		| MCF_GPIO_PQSPAR_QSPI_DIN_GPIO	// SSEG0 DIG1
-		| MCF_GPIO_PQSPAR_QSPI_CLK_GPIO;// SSEG0 DIG0
-		
+		| MCF_GPIO_PQSPAR_QSPI_CLK_GPIO // SSEG0 DIG0
+		| MCF_GPIO_PQSPAR_QSPI_CS0_GPIO;// FDD4 LED
 	// Set GPIO on QS to output mode
 	MCF_GPIO_DDRQS = 0
 		| MCF_GPIO_DDRQS_DDRQS0
@@ -637,14 +633,31 @@ inline void initializeGPIO()
 		| MCF_GPIO_DDRAN_DDRAN7;
 
 
-	// Enable RX on UART0
+	// Enable RX on port UA for serial communication,
+	// and enable GPIO on port UA for LEDs
     MCF_GPIO_PUAPAR = 0
-        | MCF_GPIO_PUAPAR_URXD0_URXD0;
+    	| MCF_GPIO_PUAPAR_UTXD0_GPIO	// FDD3	LED
+        | MCF_GPIO_PUAPAR_URXD0_URXD0
+        | MCF_GPIO_PUAPAR_URTS0_GPIO	// FDD2 LED
+        | MCF_GPIO_PUAPAR_UCTS0_GPIO;	// FDD1 LED
 	
+	// Set GPIO on UA to output mode
+	MCF_GPIO_DDRUA = 0
+		| MCF_GPIO_DDRUA_DDRUA0
+		| MCF_GPIO_DDRUA_DDRUA2
+		| MCF_GPIO_DDRUA_DDRUA3;
 	
-	// Enable IRQ signals on EPORT pin 1 (SW2)
+	// Enable IRQ signals on EPORT pin 7 (SW1), and
+	// enable GPIO on port NQ for LEDs
 	MCF_GPIO_PNQPAR = 0
-	  | MCF_GPIO_PNQPAR_IRQ1_IRQ1;
+	  | MCF_GPIO_PNQPAR_IRQ1_GPIO		// FDD0 LED
+	  | MCF_GPIO_PNQPAR_IRQ4_GPIO		// FDD5 LED
+	  | MCF_GPIO_PNQPAR_IRQ7_IRQ7;
+	
+	// Set GPIO on NQ to output mode
+	MCF_GPIO_DDRNQ = 0
+	  | MCF_GPIO_DDRNQ_DDRNQ1
+	  | MCF_GPIO_DDRNQ_DDRNQ4;
 	  
 
 	// Set FDDn output pins to low
@@ -681,20 +694,20 @@ inline void initializeInterrupts()
 	MCF_INTC0_IMRH &= ~MCF_INTC_IMRH_INT_MASK55;
 	 
 	
-	// Enable interrupts from EPORT pin 1 (SW2)
+	// Enable interrupts from EPORT pin 7 (SW1)
 	MCF_EPORT0_EPIER = 0
-	  | MCF_EPORT_EPIER_EPIE1;
+	  | MCF_EPORT_EPIER_EPIE7;
 
 	// Set EPORT to look for rising edges
 	MCF_EPORT0_EPPAR = 0
-	  | MCF_EPORT_EPPAR_EPPA1_RISING;
+	  | MCF_EPORT_EPPAR_EPPA7_RISING;
 	
-	// Clear any existing interrupt flags from EPORT pin 1
- 	MCF_EPORT0_EPFR = MCF_EPORT_EPFR_EPF1;
+	// Clear any existing interrupt flags from EPORT pin 7
+ 	MCF_EPORT0_EPFR = MCF_EPORT_EPFR_EPF7;
 	 
 	// Unmask interrupt in the interrupt controller
 	MCF_INTC0_IMRL &= ~(0
-	  | MCF_INTC_IMRL_INT_MASK1
+	  | MCF_INTC_IMRL_INT_MASK7
 	  | MCF_INTC_IMRL_MASKALL);
 }
 
@@ -761,6 +774,16 @@ inline void setFloppyPeriod(uint8 floppy, uint16 period)
 		MCF_INTC0_IMRH |= MCF_INTC_IMRH_INT_MASK55;
 		step_period[floppy] = period;
 		MCF_INTC0_IMRH = mask;
+		
+		
+		if (period == 0) 
+		{
+			floppyLEDOff(floppy);
+		}
+		else if
+		{
+			floppyLEDOn(floppy);
+		}
 	}
 }
 
@@ -817,6 +840,60 @@ inline void SSEGOff(uint8 digit)
 		break;
 	case 1:
 		MCF_GPIO_PORTQS &= ~MCF_GPIO_PORTQS_PORTQS1;
+		break;
+	}
+}
+
+inline void floppyLEDOn(uint8 floppy)
+{
+	switch (floppy) 
+	{
+	case 0:
+		MCF_GPIO_PORTNQ |= 0x02;
+		break;
+	case 1:
+		MCF_GPIO_PORTUA |= 0x8;
+		break;
+	case 2:
+		MCF_GPIO_PORTUA |= 0x2;
+		break;
+	case 3:
+		MCF_GPIO_PORTUA |= 0x1;
+		break;
+	case 4:
+		MCF_GPIO_PORTQS |= 0x8;
+		break;
+	case 5:
+		MCF_GPIO_PORTNQ |= 0x10;
+		break;
+	default:
+		break;
+	}
+}
+
+inline void floppyLEDOff(uint8 floppy)
+{
+	switch (floppy) 
+	{
+	case 0:
+		MCF_GPIO_PORTNQ &= ~0x02;
+		break;
+	case 1:
+		MCF_GPIO_PORTUA &= ~0x8;
+		break;
+	case 2:
+		MCF_GPIO_PORTUA &= ~0x2;
+		break;
+	case 3:
+		MCF_GPIO_PORTUA &= ~0x1;
+		break;
+	case 4:
+		MCF_GPIO_PORTQS &= ~0x8;
+		break;
+	case 5:
+		MCF_GPIO_PORTNQ &= ~0x10;
+		break;
+	default:
 		break;
 	}
 }

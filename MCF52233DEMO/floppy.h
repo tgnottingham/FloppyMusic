@@ -7,7 +7,7 @@
 // (50000 interrupts / sec. = 20 microsecond resolution)
 #define INTERRUPT_FREQUENCY 50000
 #define NUM_CHANNELS 16
-#define NUM_FLOPPIES 8
+#define NUM_FLOPPIES 6
 #define NUM_TRACKS 80
 #define RESET_FLOPPIES_MESSAGE 128
 
@@ -54,7 +54,7 @@
 void midiModeLoop();
 void instrumentModeLoop();
 __declspec(interrupt:0) void timerHandler(void);
-__declspec(interrupt:0) void sw2Handler(void);
+__declspec(interrupt:0) void sw1Handler(void);
 void resetFloppies();
 void initializeFloppies();
 void initializeGPIO();
@@ -66,6 +66,8 @@ void setFloppyPeriod(uint8 floppy, uint16 period);
 void setSSEG(uint8 state);
 void SSEGOn(uint8 digit);
 void SSEGOff(uint8 digit);
+void floppyLEDOn(uint8 floppy);
+void floppyLEDOff(uint8 floppy);
 uint8 getNearestNoteIndex(uint16 period);
 
 #endif

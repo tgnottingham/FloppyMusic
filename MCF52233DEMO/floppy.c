@@ -780,7 +780,7 @@ inline void setFloppyPeriod(uint8 floppy, uint16 period)
 		{
 			floppyLEDOff(floppy);
 		}
-		else if
+		else
 		{
 			floppyLEDOn(floppy);
 		}
